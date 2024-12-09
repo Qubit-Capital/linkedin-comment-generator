@@ -12,6 +12,29 @@ All notable changes to the LinkedIn Comment Generator project will be documented
 - Add comment templates feature
 - Implement comment history tracking
 
+## [1.1.0] - 2024-12-09
+
+### Added
+- Improved comment display with proper tone labels
+- Added "Generated Comments" heading above comment section
+- Enhanced tone label styling with distinct colors for different tones
+- Better handling of API response formats
+- Support for multiple comment format types (string, object with text/type, object with comment)
+
+### Changed
+- Removed regenerate comments button for cleaner interface
+- Improved comment card layout and spacing
+- Enhanced visual hierarchy with better typography
+- Updated tone label colors for better readability
+- Restructured comment container hierarchy
+
+### Fixed
+- Fixed heading visibility issues
+- Improved tone label display consistency
+- Better error handling for API responses
+- Fixed comment text display issues
+- Enhanced fallback handling for missing tones
+
 ## [0.1.0] - 2024-12-09
 
 ### Added
