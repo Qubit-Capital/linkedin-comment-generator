@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Comment Generator",
+  "version": "1.0",
+  "description": "Add AI-powered comment generation to LinkedIn posts",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.linkedin.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.linkedin.com/*"],
+      "css": ["styles.css"],
+      "js": ["content.js"]
+    }
+  ]
+}
