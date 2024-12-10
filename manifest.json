@@ -4,11 +4,16 @@
   "version": "1.0",
   "description": "Add AI-powered comment generation to LinkedIn posts",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage",
+    "background"
   ],
   "host_permissions": [
     "https://*.linkedin.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html"
   },

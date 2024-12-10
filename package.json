@@ -1,0 +1,25 @@
+{
+  "name": "linkedin-comment-generator",
+  "version": "1.1.0",
+  "description": "Chrome extension for generating contextual LinkedIn comments",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "mongodb": "^6.3.0",
+    "dotenv": "^16.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Qubit-Capital/linkedin-comment-generator.git"
+  },
+  "keywords": [
+    "linkedin",
+    "comments",
+    "automation",
+    "chrome-extension"
+  ],
+  "author": "Qubit Capital",
+  "license": "MIT"
+}
