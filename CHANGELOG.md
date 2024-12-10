@@ -12,6 +12,25 @@ All notable changes to the LinkedIn Comment Generator project will be documented
 - Add comment templates feature
 - Implement comment history tracking
 
+## Future Tasks [Planned]
+
+### Database Integration
+- Create a remote database to store:
+  - Generated comments history
+  - Selected comments for each post
+  - Post context and metadata
+  - Comment selection patterns
+- Implement data synchronization
+- Add analytics capabilities
+
+### Commenter Context Analysis
+- Add interface for commenter context input
+- Create context selector UI
+- Pre-feed context analysis to comment generation
+- Process selected comments with context
+- Implement context-aware comment refinement
+- Add context templates and presets
+
 ## [1.1.0] - 2024-12-09
 
 ### Added
