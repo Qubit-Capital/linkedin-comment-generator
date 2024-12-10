@@ -5,11 +5,8 @@ All notable changes to the LinkedIn Comment Generator project will be documented
 ## [Unreleased]
 
 ### Planned Features
-- Add AI-powered comment suggestions
 - Implement user customization for comment styles
 - Add support for multiple languages
-- Create a settings panel for user preferences
-- Add comment templates feature
 - Implement comment history tracking
 
 ## Future Tasks [Planned]
@@ -85,15 +82,12 @@ All notable changes to the LinkedIn Comment Generator project will be documented
 
 ### Short-term Goals (Next Release)
 - Enhance UI/UX design
-- Add more comment generation options
 - Implement error handling and logging
 - Add user feedback mechanism
 
 ### Long-term Goals
-- Create an API for comment suggestions
 - Add analytics for usage tracking
 - Implement machine learning for better suggestions
-- Add support for other social media platforms
 
 ## Contributing
 We welcome contributions! Please see the README.md for contribution guidelines.
