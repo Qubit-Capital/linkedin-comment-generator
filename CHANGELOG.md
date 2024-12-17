@@ -96,6 +96,38 @@ All notable changes to this project will be documented in this file.
   - `test-operations.js`: General operations testing
   - `test-schema.js`: Schema validation testing
 
+## [1.1.0] - 2024-12-17
+
+### Added
+- Enhanced UI/UX improvements
+  - Redesigned modal with modern styling and animations
+  - Added vertical loading animation with progress indicator
+  - Implemented grid layout for comment display
+  - Added tone-based color coding for comments
+  - Improved button styling and interactions
+
+### Changed
+- Modal interface improvements
+  - Removed duplicate headings and buttons
+  - Added regenerate comments functionality
+  - Improved close button design
+  - Enhanced modal responsiveness
+  - Better spacing and typography
+
+### Fixed
+- Fixed comment generation issues
+  - Improved post text extraction reliability
+  - Better error handling for failed API calls
+  - Fixed modal visibility issues
+  - Resolved loading state management
+
+### Technical Updates
+- Code organization improvements
+  - Separated concerns in modal creation and management
+  - Better function structure for comment display
+  - Improved CSS organization and naming
+  - Enhanced error handling and user feedback
+
 ## [1.1.0] - 2024-12-09
 
 ### Added

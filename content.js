@@ -1,51 +1,200 @@
-// Function to get post text using multiple selectors
-function getPostText(button) {
-    // Find the post container by traversing up from the button
-    const postContainer = button.closest('.feed-shared-update-v2') || 
-                         button.closest('.feed-shared-post') ||
-                         button.closest('.feed-shared-update') ||
-                         button.closest('div[data-urn]');
+// Function to create comment modal
+function createCommentModal() {
+    const modal = document.createElement('div');
+    modal.className = 'comment-modal hidden';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Generated Comments</h2>
+                <button class="modal-close" aria-label="Close">×</button>
+            </div>
+            <div class="loading-container hidden">
+                <div class="loading-spinner">
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                </div>
+                <div class="loading-text">Generating comments...</div>
+            </div>
+            <div class="error-message hidden"></div>
+            <div class="comments-list"></div>
+        </div>
+    `;
+
+    modal.querySelector('.modal-close').addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// Function to display comment options
+function displayCommentOptions(comments, modal, commentField) {
+    const commentsList = modal.querySelector('.comments-list');
+    commentsList.innerHTML = '';
     
-    if (!postContainer) {
-        console.log('Could not find post container');
-        return null;
-    }
+    // Store the reference to the post container
+    const postContainer = commentField.closest('.feed-shared-update-v2') || 
+                         commentField.closest('.feed-shared-post') ||
+                         commentField.closest('.feed-shared-update');
+    
+    // Create a container for the entire comments section
+    const commentsContainer = document.createElement('div');
+    commentsContainer.className = 'comments-container';
+    
+    // Add action buttons container
+    const actionButtonsContainer = document.createElement('div');
+    actionButtonsContainer.className = 'action-buttons';
 
-    // Get the main post content first (excluding replies)
-    const mainPostContent = postContainer.querySelector('.feed-shared-update-v2__description');
-    if (mainPostContent) {
-        const text = mainPostContent.textContent.trim();
-        if (text) {
-            console.log('Found main post content:', text);
-            return text;
-        }
-    }
-
-    // Fallback selectors for different post types
-    const selectors = [
-        '.feed-shared-text-view span[dir="ltr"]',
-        '.feed-shared-text',
-        '.update-components-text',
-        '[data-test-id="main-feed-activity-card__commentary"]'
-    ];
-
-    // Try each selector but exclude reply sections
-    for (const selector of selectors) {
-        const elements = Array.from(postContainer.querySelectorAll(selector))
-            .filter(el => !el.closest('.comments-comment-item')); // Exclude replies
-        
-        if (elements.length > 0) {
-            // Get text from the first matching element
-            const text = elements[0].textContent.trim();
-            if (text) {
-                console.log(`Found post text using selector: ${selector}`);
-                return text;
+    // Add regenerate button
+    const regenerateButton = document.createElement('button');
+    regenerateButton.className = 'action-button regenerate-button';
+    regenerateButton.innerHTML = '<i class="fas fa-sync-alt"></i> Regenerate Comments';
+    regenerateButton.addEventListener('click', async () => {
+        try {
+            // Hide the current comments and show loading
+            commentsContainer.style.display = 'none';
+            const loadingContainer = modal.querySelector('.loading-container') || createLoadingContainer();
+            if (!modal.contains(loadingContainer)) {
+                modal.appendChild(loadingContainer);
             }
+            loadingContainer.classList.remove('hidden');
+
+            // Get post text using the stored post container reference
+            const postText = getPostText(postContainer);
+            if (!postText) {
+                throw new Error('Could not find post content');
+            }
+
+            // Generate new comments
+            const newComments = await fetchCommentSuggestions(postText);
+            
+            // Remove loading container and display new comments
+            loadingContainer.classList.add('hidden');
+            commentsContainer.style.display = 'block';
+            displayCommentOptions(newComments, modal, commentField);
+            showNotification('Comments regenerated successfully!', 'success');
+        } catch (error) {
+            console.error('Error regenerating comments:', error);
+            showNotification('Failed to regenerate comments. Please try again.', 'error');
+            commentsContainer.style.display = 'block';
         }
+    });
+    actionButtonsContainer.appendChild(regenerateButton);
+
+    commentsContainer.appendChild(actionButtonsContainer);
+    
+    // Create a container for the comment cards
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'comment-cards';
+    
+    // Display each comment option
+    comments.forEach((comment, index) => {
+        const option = document.createElement('div');
+        option.className = 'comment-option';
+        
+        // Ensure tone is properly formatted and defaulted if missing
+        const tone = comment.tone || 'Neutral';
+        const toneClass = tone.toLowerCase().replace(/\s+/g, '-');
+        
+        option.innerHTML = `
+            <div class="comment-header">
+                <span class="comment-tone ${toneClass}">${tone}</span>
+            </div>
+            <div class="comment-text">${comment.text || ''}</div>
+            <div class="comment-actions">
+                <button class="use-comment-button">Use This Comment</button>
+            </div>
+        `;
+        
+        option.querySelector('.use-comment-button').addEventListener('click', async () => {
+            try {
+                const postId = postContainer.getAttribute('data-urn') || 
+                              postContainer.getAttribute('data-id');
+                              
+                const postUrl = window.location.href;
+                
+                // Prepare data for logging
+                const commentData = {
+                    postId: postId,
+                    postUrl: postUrl,
+                    postContent: getPostText(postContainer),
+                    comment: {
+                        text: comment.text,
+                        tone: tone,
+                        timestamp: new Date(),
+                        isSelected: true
+                    },
+                    metrics: {
+                        likes: 0,
+                        replies: 0,
+                        lastChecked: new Date()
+                    }
+                };
+                
+                // Send data to background script for storage
+                const response = await chrome.runtime.sendMessage({
+                    action: 'saveComment',
+                    data: commentData
+                });
+                
+                if (!response.success) {
+                    throw new Error(response.error || 'Failed to save comment data');
+                }
+                
+                // Update UI
+                commentField.textContent = comment.text;
+                commentField.dispatchEvent(new Event('input', { bubbles: true }));
+                modal.classList.add('hidden');
+                showNotification('Comment added successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error saving comment:', error);
+                showNotification('Error saving comment data', 'error');
+            }
+        });
+        
+        cardsContainer.appendChild(option);
+    });
+    
+    // Append cards container to main container
+    commentsContainer.appendChild(cardsContainer);
+    // Append main container to comments list
+    commentsList.appendChild(commentsContainer);
+
+    // Hide loading container if it exists
+    const loadingContainer = modal.querySelector('.loading-container');
+    if (loadingContainer) {
+        loadingContainer.classList.add('hidden');
     }
 
-    console.log('No post text found');
-    return null;
+    // Make sure modal is visible
+    modal.classList.remove('hidden');
+}
+
+// Function to get post text from the feed item
+function getPostText(postElement) {
+    if (!postElement) return '';
+    
+    // Try different possible post content selectors
+    const contentSelectors = [
+        '.feed-shared-update-v2__description',
+        '.feed-shared-text-view',
+        '.feed-shared-inline-show-more-text',
+        '.feed-shared-update__description',
+        '.update-components-text'
+    ];
+    
+    for (const selector of contentSelectors) {
+        const element = postElement.querySelector(selector);
+        if (element) {
+            return element.textContent.trim();
+        }
+    }
+    
+    return '';
 }
 
 // Function to parse API response
@@ -106,60 +255,6 @@ function parseApiResponse(responseText) {
         console.error('Error parsing API response:', error);
         throw new Error('Failed to parse API response');
     }
-}
-
-// Function to display comment options
-function displayCommentOptions(comments, modal, commentField) {
-    const commentsList = modal.querySelector('.comments-list');
-    commentsList.innerHTML = '';
-    
-    // Create a container for the entire comments section
-    const commentsContainer = document.createElement('div');
-    commentsContainer.className = 'comments-container';
-    
-    // Add heading for generated comments
-    const heading = document.createElement('h2');
-    heading.className = 'comments-heading';
-    heading.textContent = 'Generated Comments';
-    commentsContainer.appendChild(heading);
-    
-    // Create a container for the comment cards
-    const cardsContainer = document.createElement('div');
-    cardsContainer.className = 'comment-cards';
-    
-    // Display each comment option
-    comments.forEach((comment, index) => {
-        const option = document.createElement('div');
-        option.className = 'comment-option';
-        
-        // Ensure tone is properly formatted and defaulted if missing
-        const tone = comment.tone || 'Neutral';
-        const toneClass = tone.toLowerCase().replace(/\s+/g, '-');
-        
-        option.innerHTML = `
-            <div class="comment-header">
-                <span class="comment-tone ${toneClass}">${tone}</span>
-            </div>
-            <div class="comment-text">${comment.text || ''}</div>
-            <div class="comment-actions">
-                <button class="use-comment-button">Use This Comment</button>
-            </div>
-        `;
-        
-        option.querySelector('.use-comment-button').addEventListener('click', () => {
-            commentField.textContent = comment.text;
-            commentField.dispatchEvent(new Event('input', { bubbles: true }));
-            modal.classList.add('hidden');
-            showNotification('Comment added successfully!', 'success');
-        });
-        
-        cardsContainer.appendChild(option);
-    });
-    
-    // Append cards container to main container
-    commentsContainer.appendChild(cardsContainer);
-    // Append main container to comments list
-    commentsList.appendChild(commentsContainer);
 }
 
 // Function to clean and preprocess post text
@@ -288,51 +383,128 @@ function createCommentModal() {
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">Choose a Comment</h3>
-                <button class="close-button">×</button>
+                <h2>Generated Comments</h2>
+                <button class="modal-close" aria-label="Close">×</button>
             </div>
-            <div class="modal-body">
-                <div class="loading-container hidden">
-                    ${createLoadingSpinner().outerHTML}
-                    <p>Generating comment...</p>
+            <div class="loading-container hidden">
+                <div class="loading-spinner">
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
                 </div>
-                <div class="error-message hidden">
-                    Failed to generate comment. Please try again.
-                </div>
-                <div class="comments-list"></div>
+                <div class="loading-text">Generating comments...</div>
             </div>
+            <div class="error-message hidden"></div>
+            <div class="comments-list"></div>
         </div>
     `;
-    
-    // Add close button handler
-    modal.querySelector('.close-button').addEventListener('click', () => {
+
+    // Add close button event listener
+    modal.querySelector('.modal-close').addEventListener('click', () => {
         modal.classList.add('hidden');
     });
-    
+
+    document.body.appendChild(modal);
     return modal;
 }
 
 // Function to handle comment generation
 async function handleCommentGeneration(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const button = event.currentTarget;
-    const commentField = button.closest('.comment-generator-container')
-        .nextElementSibling
-        .querySelector('[contenteditable="true"]');
-    
-    if (!commentField) return;
-    
-    // Get or create modal
+    try {
+        const button = event.target;
+        
+        // Find the post container
+        const postContainer = button.closest('.feed-shared-update-v2') || 
+                            button.closest('.feed-shared-post') ||
+                            button.closest('.feed-shared-update');
+                            
+        if (!postContainer) {
+            throw new Error('Could not find post container. Please make sure you are on a LinkedIn post.');
+        }
+
+        // Get the post text
+        const postText = getPostText(postContainer);
+        if (!postText) {
+            throw new Error('Could not find post content. Please make sure you are on a LinkedIn post.');
+        }
+
+        // Find or create the comment field
+        const commentField = findCommentField(button);
+        if (!commentField) {
+            throw new Error('Could not find comment field. Please make sure you are on a LinkedIn post.');
+        }
+
+        // Show loading state
+        const modal = createOrGetModal();
+        modal.classList.remove('hidden'); // Make sure modal is visible
+        showLoadingState(modal);
+
+        // Generate comments
+        const comments = await fetchCommentSuggestions(postText);
+        
+        // Display comment options
+        displayCommentOptions(comments, modal, commentField);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+// Function to find comment field
+function findCommentField(button) {
+    // First try to find the comment field within the post container
+    const postContainer = button.closest('.feed-shared-update-v2') || 
+                         button.closest('.feed-shared-post') ||
+                         button.closest('.feed-shared-update');
+                         
+    if (!postContainer) return null;
+
+    // Try different selectors for the comment field
+    const commentFieldSelectors = [
+        'div[contenteditable="true"]',
+        'div[role="textbox"]',
+        '.comments-comment-box__form-container div[contenteditable="true"]',
+        '.comments-comment-texteditor__content'
+    ];
+
+    for (const selector of commentFieldSelectors) {
+        const field = postContainer.querySelector(selector);
+        if (field) return field;
+    }
+
+    return null;
+}
+
+// Function to create loading container
+function createLoadingContainer() {
+    const loadingContainer = document.createElement('div');
+    loadingContainer.className = 'loading-container';
+    loadingContainer.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner-dot"></div>
+            <div class="spinner-dot"></div>
+            <div class="spinner-dot"></div>
+            <div class="spinner-dot"></div>
+        </div>
+        <div class="loading-text">Generating comments...</div>
+    `;
+    return loadingContainer;
+}
+
+// Function to create or get modal
+function createOrGetModal() {
     let modal = document.querySelector('.comment-modal');
     if (!modal) {
         modal = createCommentModal();
         document.body.appendChild(modal);
     }
-    
-    // Show modal and loading state
-    modal.classList.remove('hidden');
+    return modal;
+}
+
+// Function to show loading state
+function showLoadingState(modal) {
     const loadingContainer = modal.querySelector('.loading-container');
     const errorMessage = modal.querySelector('.error-message');
     const commentsList = modal.querySelector('.comments-list');
@@ -340,25 +512,6 @@ async function handleCommentGeneration(event) {
     loadingContainer.classList.remove('hidden');
     errorMessage.classList.add('hidden');
     commentsList.innerHTML = '';
-    
-    try {
-        const postText = getPostText(button);
-        if (!postText) {
-            throw new Error('Could not find post content. Please make sure you are on a LinkedIn post.');
-        }
-        
-        console.log('Extracted post text:', postText);
-        const comments = await fetchCommentSuggestions(postText);
-        
-        loadingContainer.classList.add('hidden');
-        displayCommentOptions(comments, modal, commentField);
-    } catch (error) {
-        console.error('Error:', error);
-        loadingContainer.classList.add('hidden');
-        errorMessage.classList.remove('hidden');
-        errorMessage.textContent = error.message || 'Failed to generate comment. Please try again.';
-        showNotification(error.message || 'Failed to generate comment. Please try again.', 'error');
-    }
 }
 
 // Function to show a notification to the user
@@ -477,152 +630,334 @@ const style = document.createElement('style');
 style.textContent = `
     .comment-modal {
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
         z-index: 10000;
-        max-width: 600px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
+        backdrop-filter: blur(4px);
     }
-    
+
+    .modal-content {
+        background: white;
+        width: 90%;
+        max-width: 800px;
+        max-height: 90vh;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
     .modal-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #eee;
+        padding: 20px 24px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #f9fafb;
     }
-    
-    .modal-title {
-        font-size: 18px;
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #1a1f36;
         font-weight: 600;
-        color: #333;
     }
-    
-    .close-button {
+
+    .modal-close {
         background: none;
         border: none;
-        font-size: 24px;
-        cursor: pointer;
+        font-size: 28px;
         color: #666;
-    }
-    
-    .comments-list {
+        cursor: pointer;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
         display: flex;
-        flex-direction: column;
-        gap: 15px;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
     }
-    
+
+    .modal-close:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
+
+    .comments-list {
+        padding: 24px;
+        overflow-y: auto;
+        max-height: calc(90vh - 80px);
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-bottom: 24px;
+        padding: 0 4px;
+    }
+
+    .action-button {
+        padding: 10px 20px;
+        border-radius: 24px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .action-button i {
+        font-size: 16px;
+    }
+
+    .regenerate-button {
+        background-color: #0a66c2;
+        color: white;
+    }
+
+    .regenerate-button:hover {
+        background-color: #004182;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .comment-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
     .comment-option {
-        background: #f8f9fa;
-        border: 1px solid #e1e4e8;
-        border-radius: 8px;
-        padding: 15px;
-        transition: transform 0.2s, box-shadow 0.2s;
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e0e0e0;
     }
-    
+
     .comment-option:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        border-color: #ccc;
     }
-    
+
     .comment-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
     }
-    
+
     .comment-tone {
-        padding: 4px 8px;
-        border-radius: 12px;
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 500;
+        margin-right: 8px;
+        text-transform: uppercase;
     }
-    
-    .comment-tone.neutral {
-        background-color: #e1e4e8;
-        color: #24292e;
-    }
-    
-    .comment-tone.positive {
-        background-color: #dcffe4;
-        color: #1a7f37;
-    }
-    
-    .comment-tone.friendly {
-        background-color: #fff3e0;
-        color: #9a6700;
-    }
-    
-    .comment-tone.curious {
-        background-color: #ddf4ff;
-        color: #0969da;
-    }
-    
+
     .comment-text {
-        font-size: 14px;
-        line-height: 1.5;
-        color: #24292e;
-        margin-bottom: 12px;
-        white-space: pre-wrap;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #1a1f36;
+        flex-grow: 1;
+        margin: 12px 0;
     }
-    
+
     .comment-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 10px;
     }
-    
+
     .use-comment-button {
-        background-color: #0a66c2;
+        background: #0a66c2;
         color: white;
         border: none;
-        border-radius: 16px;
-        padding: 8px 16px;
-        font-size: 14px;
-        font-weight: 600;
+        padding: 10px 20px;
+        border-radius: 20px;
         cursor: pointer;
-        transition: background-color 0.2s;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-size: 14px;
     }
-    
+
     .use-comment-button:hover {
-        background-color: #004182;
+        background: #004182;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    
+
+    .comment-tone.neutral { 
+        background: #f3f6f8; 
+        color: #475569;
+    }
+    .comment-tone.positive { 
+        background: #dcfce7; 
+        color: #166534;
+    }
+    .comment-tone.friendly { 
+        background: #fff7ed; 
+        color: #9a3412;
+    }
+    .comment-tone.curious { 
+        background: #eff6ff; 
+        color: #1e40af;
+    }
+    .comment-tone.enthusiastic { 
+        background: #fdf2f8; 
+        color: #be185d;
+    }
+    .comment-tone.serious { 
+        background: #f8fafc; 
+        color: #334155;
+    }
+    .comment-tone.empathetic { 
+        background: #f3e8ff; 
+        color: #6b21a8;
+    }
+
     .loading-container {
         display: flex;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 20px;
+        padding: 40px;
+        gap: 20px;
     }
-    
-    .loading-dots {
+
+    .loading-text {
+        color: #666;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .loading-spinner {
         display: flex;
+        flex-direction: column;
         gap: 4px;
+        height: 60px;
+        align-items: center;
     }
-    
-    .dot {
+
+    .spinner-dot {
         width: 8px;
         height: 8px;
         background-color: #0a66c2;
         border-radius: 50%;
-        animation: bounce 1.4s infinite ease-in-out;
+        animation: pulseAndMove 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        opacity: 0;
     }
-    
-    .dot:nth-child(1) { animation-delay: -0.32s; }
-    .dot:nth-child(2) { animation-delay: -0.16s; }
-    
-    @keyframes bounce {
-        0%, 80%, 100% { transform: scale(0); }
-        40% { transform: scale(1); }
+
+    .spinner-dot:nth-child(1) {
+        animation-delay: 0s;
+    }
+
+    .spinner-dot:nth-child(2) {
+        animation-delay: 0.3s;
+    }
+
+    .spinner-dot:nth-child(3) {
+        animation-delay: 0.6s;
+    }
+
+    .spinner-dot:nth-child(4) {
+        animation-delay: 0.9s;
+    }
+
+    @keyframes pulseAndMove {
+        0% {
+            transform: translateY(0);
+            opacity: 0;
+        }
+        25% {
+            opacity: 0.5;
+        }
+        50% {
+            transform: translateY(20px);
+            opacity: 1;
+        }
+        75% {
+            opacity: 0.5;
+        }
+        100% {
+            transform: translateY(40px);
+            opacity: 0;
+        }
+    }
+
+    .notification {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 16px 24px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 10001;
+        animation: slideIn 0.3s ease-out;
+        max-width: 400px;
+        font-size: 14px;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .notification.success {
+        border-left: 4px solid #22c55e;
+    }
+
+    .notification.error {
+        border-left: 4px solid #ef4444;
+    }
+
+    .notification i {
+        font-size: 20px;
+    }
+
+    .notification.success i {
+        color: #22c55e;
+    }
+
+    .notification.error i {
+        color: #ef4444;
     }
 `;
 
@@ -677,9 +1012,9 @@ const styles = `
 
     /* Tone-specific styles */
     .comment-tone.neutral { background: #f3f6f8; color: #666; }
-    .comment-tone.positive { background: #e6f7e6; color: #0a7a0a; }
+    .comment-tone.positive { background: #e6f7e6; color: #1a7f37; }
     .comment-tone.friendly { background: #fff3e0; color: #b36200; }
-    .comment-tone.curious { background: #e3f2fd; color: #0055b3; }
+    .comment-tone.curious { background: #e3f2fd; color: #0969da; }
     .comment-tone.enthusiastic { background: #fce4ec; color: #c2185b; }
     .comment-tone.serious { background: #efebe9; color: #4e342e; }
     .comment-tone.empathetic { background: #f3e5f5; color: #7b1fa2; }
@@ -707,7 +1042,7 @@ const styles = `
         border-radius: 16px;
         padding: 8px 16px;
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
         transition: background-color 0.2s;
     }

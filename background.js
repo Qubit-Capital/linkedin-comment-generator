@@ -1,6 +1,6 @@
 const { MongoClient } = require('mongodb');
 const { connectDB } = require('./db/config');
-const { startEngagementTracking, updateEngagementMetrics } = require('./db/engagement-operations');
+const { startEngagementTracking, updateEngagementMetrics, Engagement } = require('./db/engagement-operations');
 const uri = "mongodb+srv://malaygupta:3VXz24KhjZJEbX55@linkedin-comment-genera.oq68x.mongodb.net/?retryWrites=true&w=majority&appName=linkedin-comment-generator";
 const client = new MongoClient(uri);
 
@@ -13,7 +13,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         saveCommentToDb(request.data)
             .then(async (result) => {
                 // Start tracking engagement for the saved comment
-                await startEngagementTracking(result.comment, result.comment.postUrl);
+                await startEngagementTracking(result.comment._id);
                 sendResponse({ success: true, result });
             })
             .catch(error => sendResponse({ success: false, error: error.message }));
@@ -197,31 +197,77 @@ async function updateAnalytics(analyticsData) {
 
 async function saveCommentToDb(data) {
     try {
-        await client.connect();
-        const db = client.db("linkedin_comments");
-        const collection = db.collection("comments");
-        
-        const commentDoc = {
-            postId: data.postId,
-            postUrl: data.postUrl,
-            commentText: data.commentText,
-            authorId: data.authorId,
-            authorName: data.authorName,
-            timestamp: new Date(),
-            metadata: {
-                likes: 0,
-                replies: 0
+        // Create engagement document
+        const engagement = new Engagement({
+            postMeta: {
+                postId: data.postId,
+                postUrl: data.postUrl,
+                postContent: data.postContent,
+                postDate: new Date(),
+                postEngagement: {
+                    likes: 0,
+                    comments: 0,
+                    shares: 0,
+                    lastChecked: new Date()
+                }
+            },
+            generatedComments: [{
+                text: data.comment.text,
+                tone: data.comment.tone,
+                timestamp: data.comment.timestamp,
+                isSelected: data.comment.isSelected
+            }],
+            selectedComment: {
+                text: data.comment.text,
+                selectionDate: new Date(),
+                metrics: {
+                    likes: 0,
+                    replies: 0,
+                    lastChecked: new Date()
+                },
+                performance: {
+                    clickThroughRate: 0,
+                    conversionRate: 0,
+                    responseTime: 0
+                }
+            },
+            tracking: {
+                period: {
+                    start: new Date(),
+                    isActive: true
+                },
+                history: [{
+                    timestamp: new Date(),
+                    metrics: {
+                        likes: 0,
+                        replies: 0,
+                        engagement: {
+                            clickThroughRate: 0,
+                            conversionRate: 0,
+                            responseTime: 0
+                        }
+                    }
+                }],
+                trends: {
+                    likesGrowthRate: 0,
+                    repliesGrowthRate: 0,
+                    overallScore: 0,
+                    lastCalculated: new Date()
+                }
             }
-        };
+        });
+
+        // Save to database
+        const savedEngagement = await engagement.save();
+        console.log('Saved comment data:', savedEngagement);
         
-        const result = await collection.insertOne(commentDoc);
-        console.log("Comment saved to database:", result);
-        return { success: true, comment: commentDoc };
+        // Start engagement tracking
+        startEngagementTracking(savedEngagement._id);
+        
+        return { success: true, comment: savedEngagement };
     } catch (error) {
-        console.error("Error saving to database:", error);
+        console.error('Error saving comment:', error);
         throw error;
-    } finally {
-        await client.close();
     }
 }
 
