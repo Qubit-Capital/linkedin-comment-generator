@@ -16,6 +16,60 @@ All notable changes to this project will be documented in this file.
    - Implement context-based comment processing
    - Create context templates system
 
+## [Unreleased]
+### To-Do List
+- Add email notifications for high-performing comments
+  - Setup email service integration
+  - Configure notification thresholds
+  - Design email templates
+  - Add user notification preferences
+
+- Implement more detailed trend analysis
+  - Add time-based correlation analysis
+  - Implement content-based performance analysis
+  - Add seasonality detection
+  - Create trend visualization data
+
+- Add custom tracking periods
+  - Allow user-defined tracking intervals
+  - Implement flexible data aggregation
+  - Add period comparison features
+  - Create period-based reporting
+
+- Setup automated reports
+  - Design report templates
+  - Add scheduled report generation
+  - Implement report delivery system
+  - Create customizable report formats
+
+## [1.2.0] - 2024-12-16
+
+### Added
+- Integrated engagement tracking system into background.js
+  - Added automatic engagement tracking for all generated comments
+  - Implemented metrics collection for likes, replies, and engagement rates
+  - Added AI metadata tracking with confidence scores
+  - Implemented conversion rate and response time tracking
+
+### Enhanced
+- Improved comment document structure in MongoDB
+  - Added metadata fields for better analytics
+  - Enhanced tracking capabilities with timestamp and engagement metrics
+  - Added AI model metadata and confidence scoring
+
+### Changed
+- Updated background.js message handlers
+  - Added new 'updateEngagement' action for real-time metric updates
+  - Enhanced comment saving with automatic engagement tracking
+  - Improved error handling and logging
+
+### Technical
+- Added new functions for engagement tracking:
+  - `updateCommentEngagement`: Updates metrics like likes, replies, CTR
+  - Enhanced `saveCommentToDb` with engagement metadata
+  - Modified `saveGeneratedCommentsToDb` with AI metadata
+  - Added automatic engagement tracking initialization
+
 ## [1.1.0] - 2024-12-09
 
 ### Added

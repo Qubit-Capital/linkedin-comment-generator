@@ -1,140 +1,180 @@
+const Comment = require('./models/Comment');
 const { connectDB } = require('./config');
 
-class DatabaseOperations {
-    constructor() {
-        this.db = null;
-        this.initialize();
-    }
+// Initialize database connection
+connectDB().catch(console.error);
 
-    async initialize() {
-        this.db = await connectDB();
-    }
-
-    // Post Operations
-    async savePost(postData) {
-        try {
-            const posts = this.db.collection('posts');
-            const result = await posts.updateOne(
-                { postId: postData.postId },
-                { $set: { ...postData, timestamp: new Date() } },
-                { upsert: true }
-            );
-            return result;
-        } catch (error) {
-            console.error('Error saving post:', error);
-            throw error;
-        }
-    }
-
-    // Comment Operations
-    async saveGeneratedComments(postId, comments, userContext) {
-        try {
-            const commentsCollection = this.db.collection('comments');
-            const commentData = {
-                postId,
-                generatedComments: comments.map(comment => ({
-                    ...comment,
-                    timestamp: new Date(),
-                    isSelected: false
-                })),
-                userContext,
-                metadata: {
-                    regenerationCount: 0,
-                    generationDuration: 0,
-                    errorLogs: []
+// Create a new comment entry
+async function createComment(postData, generatedComment) {
+    try {
+        const comment = new Comment({
+            postId: postData.postId,
+            postContent: postData.content,
+            postMetadata: {
+                authorName: postData.authorName,
+                authorId: postData.authorId,
+                postUrl: postData.url,
+                timestamp: new Date(),
+                engagement: {
+                    likes: postData.engagement?.likes || 0,
+                    comments: postData.engagement?.comments || 0,
+                    shares: postData.engagement?.shares || 0
                 }
-            };
-
-            const result = await commentsCollection.updateOne(
-                { postId },
-                { $push: { generatedComments: { $each: commentData.generatedComments } } },
-                { upsert: true }
-            );
-            return result;
-        } catch (error) {
-            console.error('Error saving generated comments:', error);
-            throw error;
-        }
-    }
-
-    async updateSelectedComment(postId, selectedComment) {
-        try {
-            const commentsCollection = this.db.collection('comments');
-            const result = await commentsCollection.updateOne(
-                { postId },
-                { 
-                    $set: { 
-                        selectedComment: {
-                            ...selectedComment,
-                            timestamp: new Date()
-                        }
-                    },
-                    $inc: { 'metadata.regenerationCount': 1 }
+            },
+            generatedComments: [{
+                text: generatedComment.text,
+                tone: generatedComment.tone,
+                timestamp: new Date(),
+                isSelected: false,
+                aiMetadata: {
+                    model: generatedComment.model || 'gpt-3.5-turbo',
+                    confidence: generatedComment.confidence,
+                    generationTime: generatedComment.generationTime
                 }
-            );
-            return result;
-        } catch (error) {
-            console.error('Error updating selected comment:', error);
-            throw error;
-        }
-    }
+            }],
+            userContext: {
+                preferredTone: postData.userContext?.preferredTone,
+                customInstructions: postData.userContext?.customInstructions,
+                templates: postData.userContext?.templates || []
+            }
+        });
 
-    // Analytics Operations
-    async updateAnalytics(metrics) {
-        try {
-            const analytics = this.db.collection('analytics');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const result = await analytics.updateOne(
-                { date: today },
-                { 
-                    $inc: {
-                        'metrics.totalGenerations': 1,
-                        'metrics.uniquePosts': 1
-                    },
-                    $set: {
-                        'metrics.averageGenerationTime': metrics.generationTime,
-                        'metrics.popularTones': metrics.tones
-                    }
-                },
-                { upsert: true }
-            );
-            return result;
-        } catch (error) {
-            console.error('Error updating analytics:', error);
-            throw error;
-        }
-    }
-
-    // Query Operations
-    async getPostHistory(postId) {
-        try {
-            const comments = await this.db.collection('comments')
-                .findOne({ postId });
-            return comments;
-        } catch (error) {
-            console.error('Error fetching post history:', error);
-            throw error;
-        }
-    }
-
-    async getAnalyticsSummary(startDate, endDate) {
-        try {
-            const analytics = await this.db.collection('analytics')
-                .find({
-                    date: {
-                        $gte: startDate,
-                        $lte: endDate
-                    }
-                })
-                .toArray();
-            return analytics;
-        } catch (error) {
-            console.error('Error fetching analytics summary:', error);
-            throw error;
-        }
+        await comment.save();
+        return comment;
+    } catch (error) {
+        console.error('Error creating comment:', error);
+        throw error;
     }
 }
 
-module.exports = new DatabaseOperations();
+// Add a new generated comment to an existing post
+async function addGeneratedComment(postId, generatedComment) {
+    try {
+        const comment = await Comment.findOne({ postId });
+        if (!comment) {
+            throw new Error('Post not found');
+        }
+
+        comment.generatedComments.push({
+            text: generatedComment.text,
+            tone: generatedComment.tone,
+            timestamp: new Date(),
+            isSelected: false,
+            aiMetadata: {
+                model: generatedComment.model || 'gpt-3.5-turbo',
+                confidence: generatedComment.confidence,
+                generationTime: generatedComment.generationTime
+            }
+        });
+
+        comment.analytics.regenerationCount += 1;
+        comment.analytics.totalGenerationTime += generatedComment.generationTime || 0;
+
+        await comment.save();
+        return comment;
+    } catch (error) {
+        console.error('Error adding generated comment:', error);
+        throw error;
+    }
+}
+
+// Select a specific comment as the chosen one
+async function selectComment(postId, commentIndex) {
+    try {
+        const comment = await Comment.findOne({ postId });
+        if (!comment) {
+            throw new Error('Post not found');
+        }
+
+        // Reset all comments to unselected
+        comment.generatedComments.forEach(c => c.isSelected = false);
+
+        // Select the specified comment
+        if (comment.generatedComments[commentIndex]) {
+            comment.generatedComments[commentIndex].isSelected = true;
+            comment.analytics.selectedCommentIndex = commentIndex;
+        } else {
+            throw new Error('Comment index out of range');
+        }
+
+        await comment.save();
+        return comment;
+    } catch (error) {
+        console.error('Error selecting comment:', error);
+        throw error;
+    }
+}
+
+// Get all comments for a post
+async function getComments(postId) {
+    try {
+        return await Comment.findOne({ postId });
+    } catch (error) {
+        console.error('Error getting comments:', error);
+        throw error;
+    }
+}
+
+// Get user's comment history
+async function getUserHistory(authorId, limit = 10) {
+    try {
+        return await Comment.find({ 'postMetadata.authorId': authorId })
+            .sort({ createdAt: -1 })
+            .limit(limit);
+    } catch (error) {
+        console.error('Error getting user history:', error);
+        throw error;
+    }
+}
+
+// Log an error for a post
+async function logError(postId, errorMessage) {
+    try {
+        const comment = await Comment.findOne({ postId });
+        if (!comment) {
+            throw new Error('Post not found');
+        }
+
+        comment.analytics.errorLogs.push({
+            message: errorMessage,
+            timestamp: new Date()
+        });
+
+        await comment.save();
+        return comment;
+    } catch (error) {
+        console.error('Error logging error:', error);
+        throw error;
+    }
+}
+
+// Update user context for a post
+async function updateUserContext(postId, userContext) {
+    try {
+        const comment = await Comment.findOne({ postId });
+        if (!comment) {
+            throw new Error('Post not found');
+        }
+
+        comment.userContext = {
+            ...comment.userContext,
+            ...userContext
+        };
+
+        await comment.save();
+        return comment;
+    } catch (error) {
+        console.error('Error updating user context:', error);
+        throw error;
+    }
+}
+
+module.exports = {
+    createComment,
+    addGeneratedComment,
+    selectComment,
+    getComments,
+    getUserHistory,
+    logError,
+    updateUserContext
+};
