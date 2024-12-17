@@ -42,7 +42,14 @@ All notable changes to this project will be documented in this file.
   - Implement report delivery system
   - Create customizable report formats
 
-## [1.2.0] - 2024-12-16
+## [1.2.1] - 2024-12-17
+
+### Fixed
+- Restored direct API call for comment generation, fixing the "Cannot read properties of undefined (reading 'sendMessage')" error
+- Improved error handling for API responses
+- Maintained retry logic with exponential backoff
+
+## [1.2.0] - 2024-12-17
 
 ### Added
 - Integrated engagement tracking system into background.js
@@ -50,6 +57,14 @@ All notable changes to this project will be documented in this file.
   - Implemented metrics collection for likes, replies, and engagement rates
   - Added AI metadata tracking with confidence scores
   - Implemented conversion rate and response time tracking
+- Added new files for analytics and engagement:
+  - `db/analytics-operations.js`: Analytics operations
+  - `db/engagement-operations.js`: Engagement tracking operations
+  - `db/models/Analytics.js`: Analytics model
+  - `db/models/Comment.js`: Comment model
+  - `db/models/Engagement.js`: Engagement model
+  - `db/schemas/`: New schemas directory
+  - `engagement-scheduler.js`: Scheduler for engagement updates
 
 ### Enhanced
 - Improved comment document structure in MongoDB
@@ -62,6 +77,8 @@ All notable changes to this project will be documented in this file.
   - Added new 'updateEngagement' action for real-time metric updates
   - Enhanced comment saving with automatic engagement tracking
   - Improved error handling and logging
+- Updated package.json with new dependencies
+- Removed .env.example (replaced with proper configuration)
 
 ### Technical
 - Added new functions for engagement tracking:
@@ -69,6 +86,15 @@ All notable changes to this project will be documented in this file.
   - Enhanced `saveCommentToDb` with engagement metadata
   - Modified `saveGeneratedCommentsToDb` with AI metadata
   - Added automatic engagement tracking initialization
+
+### Testing
+- Added comprehensive test suite:
+  - `test-analytics.js`: Analytics operations testing
+  - `test-db.js`: Database operations testing
+  - `test-engagement-analysis.js`: Engagement analysis testing
+  - `test-engagement.js`: Engagement tracking testing
+  - `test-operations.js`: General operations testing
+  - `test-schema.js`: Schema validation testing
 
 ## [1.1.0] - 2024-12-09
 

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-const MONGODB_URI = "mongodb+srv://malaygupta:3VXz24KhjZJEbX55@linkedin-comment-genera.oq68x.mongodb.net/?retryWrites=true&w=majority&appName=linkedin-comment-generator";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://malaygupta:3VXz24KhjZJEbX55@linkedin-comment-genera.oq68x.mongodb.net/?retryWrites=true&w=majority&appName=linkedin-comment-generator";
 
 let connection = null;
 
@@ -19,13 +20,29 @@ async function connectDB() {
                 strict: true,
                 deprecationErrors: true,
             },
-            maxPoolSize: 10
+            maxPoolSize: 10,
+            tls: true,
+            tlsAllowInvalidCertificates: true, // Only for development
+            retryWrites: true,
+            w: 'majority'
         });
         
         console.log('Connected to MongoDB successfully');
         return connection;
     } catch (error) {
         console.error('MongoDB connection error:', error);
+        throw error;
+    }
+}
+
+async function disconnectDB() {
+    try {
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.disconnect();
+            console.log('Disconnected from MongoDB');
+        }
+    } catch (error) {
+        console.error('Error disconnecting from MongoDB:', error);
         throw error;
     }
 }
@@ -46,13 +63,15 @@ mongoose.connection.on('disconnected', () => {
 // Handle application termination
 process.on('SIGINT', async () => {
     try {
-        await mongoose.connection.close();
-        console.log('Mongoose connection closed through app termination');
+        await disconnectDB();
         process.exit(0);
-    } catch (err) {
-        console.error('Error closing mongoose connection:', err);
+    } catch (error) {
+        console.error('Error during graceful shutdown:', error);
         process.exit(1);
     }
 });
 
-module.exports = { connectDB };
+module.exports = {
+    connectDB,
+    disconnectDB
+};

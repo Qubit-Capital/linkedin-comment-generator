@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { connectDB } = require('./db/config');
+const { connectDB, disconnectDB } = require('./db/config');
 const {
     startEngagementTracking,
     updateEngagementMetrics,
@@ -17,34 +17,35 @@ async function testEngagement() {
         await connectDB();
         console.log('Connected to database');
 
-        // Test 1: Start tracking engagement
+        // 1. Test startEngagementTracking
         console.log('\n1. Testing startEngagementTracking...');
-        const mockComment = {
+        const testComment = {
             _id: new mongoose.Types.ObjectId(),
+            text: 'Test comment for engagement tracking',
             postId: 'test-post-123',
-            generatedComments: [{
-                text: 'This is a test comment',
-                isSelected: true
-            }]
+            postUrl: 'https://linkedin.com/post/test123',
+            metrics: {
+                likes: 0,
+                replies: 0,
+                lastChecked: new Date()
+            }
         };
-        const engagement = await startEngagementTracking(mockComment, 'https://linkedin.com/post/test123');
-        console.log('Started tracking:', {
-            commentId: engagement.commentId,
-            postId: engagement.postId,
-            metrics: engagement.metrics
-        });
 
-        // Test 2: Update engagement metrics
+        const tracking = await startEngagementTracking(testComment, testComment.postUrl);
+        console.log('Started tracking:', tracking);
+
+        // 2. Test updateEngagementMetrics
         console.log('\n2. Testing updateEngagementMetrics...');
-        const updatedEngagement = await updateEngagementMetrics(engagement._id, {
+        const updatedMetrics = {
             likes: 10,
-            replies: 5
-        });
-        console.log('Updated metrics:', {
-            likes: updatedEngagement.metrics.likes,
-            replies: updatedEngagement.metrics.replies,
-            lastChecked: updatedEngagement.metrics.lastChecked
-        });
+            replies: 5,
+            clickThroughRate: 0.15,
+            conversionRate: 0.05,
+            responseTime: 120
+        };
+
+        const result = await updateEngagementMetrics(tracking._id, updatedMetrics);
+        console.log('Updated metrics:', result);
 
         // Test 3: Create more test engagements
         console.log('\n3. Creating additional test engagements...');
@@ -80,12 +81,12 @@ async function testEngagement() {
 
         // Test 6: Get engagement history
         console.log('\n6. Testing getEngagementHistory...');
-        const history = await getEngagementHistory(engagement._id);
+        const history = await getEngagementHistory(tracking._id);
         console.log('Engagement history entries:', history.length);
 
         // Test 7: Stop tracking
         console.log('\n7. Testing stopEngagementTracking...');
-        const stoppedEngagement = await stopEngagementTracking(engagement._id);
+        const stoppedEngagement = await stopEngagementTracking(tracking._id);
         console.log('Stopped tracking:', {
             commentId: stoppedEngagement.commentId,
             isActive: stoppedEngagement.isActive
@@ -97,7 +98,7 @@ async function testEngagement() {
         console.error('Error during engagement testing:', error);
     } finally {
         // Close the MongoDB connection
-        await mongoose.connection.close();
+        await disconnectDB();
         console.log('Database connection closed');
         process.exit(0);
     }

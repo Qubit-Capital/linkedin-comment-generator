@@ -1,15 +1,32 @@
 {
   "name": "linkedin-comment-generator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Chrome extension for generating contextual LinkedIn comments",
   "main": "background.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:analytics": "node test-analytics.js",
+    "test:engagement": "node test-engagement.js",
+    "test:engagement-analysis": "node test-engagement-analysis.js",
+    "test:db": "node test-db.js",
+    "test:operations": "node test-operations.js",
+    "test:schema": "node test-schema.js",
+    "test:all": "npm run test:analytics && npm run test:engagement && npm run test:engagement-analysis && npm run test:db && npm run test:operations && npm run test:schema"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.js"]
   },
   "dependencies": {
     "dotenv": "^16.4.7",
     "mongodb": "^6.11.0",
     "mongoose": "^8.9.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.2"
   },
   "repository": {
     "type": "git",

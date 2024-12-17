@@ -6,34 +6,19 @@ const Comment = require('./models/Comment');
  */
 async function startEngagementTracking(comment, postUrl) {
     try {
-        // Get selected comment
-        const selectedComment = comment.generatedComments.find(c => c.isSelected) || comment.generatedComments[0];
-        
         const engagement = new Engagement({
             postMeta: {
                 postId: comment.postId,
                 postUrl: postUrl,
-                postContent: comment.postContent,
-                authorName: comment.postMetadata?.authorName,
-                authorId: comment.postMetadata?.authorId,
-                postDate: comment.postMetadata?.timestamp,
-                postEngagement: comment.postMetadata?.engagement
+                postContent: comment.text,
+                postDate: new Date()
             },
-            generatedComments: comment.generatedComments.map(c => ({
-                text: c.text,
-                tone: c.tone,
-                timestamp: c.timestamp,
-                model: c.aiMetadata?.model,
-                confidence: c.aiMetadata?.confidence,
-                isSelected: c.isSelected,
-                isPosted: false
-            })),
             activeComment: {
-                text: selectedComment.text,
-                selectionDate: selectedComment.timestamp,
+                text: comment.text,
+                selectionDate: new Date(),
                 postDate: new Date(),
                 isRegenerated: false,
-                metrics: {
+                metrics: comment.metrics || {
                     likes: 0,
                     replies: 0,
                     lastChecked: new Date()
@@ -85,12 +70,20 @@ async function updateEngagementMetrics(engagementId, metrics) {
             }
         });
 
-        // Calculate trends and performance
-        engagement.calculateTrend();
-        engagement.calculatePerformanceScore();
+        // Calculate trends
+        if (engagement.metricsHistory.length > 1) {
+            const previous = engagement.metricsHistory[engagement.metricsHistory.length - 2];
+            const current = engagement.metricsHistory[engagement.metricsHistory.length - 1];
+            
+            engagement.trends = {
+                likesGrowthRate: ((current.likes - previous.likes) / previous.likes) * 100,
+                repliesGrowthRate: ((current.replies - previous.replies) / previous.replies) * 100,
+                overallScore: calculatePerformanceScore(current)
+            };
+        }
 
         // Generate insights
-        generateInsights(engagement);
+        engagement.insights = generateInsights(engagement);
 
         engagement.status.lastUpdated = new Date();
         await engagement.save();
@@ -102,32 +95,52 @@ async function updateEngagementMetrics(engagementId, metrics) {
 }
 
 /**
+ * Calculate performance score based on metrics
+ */
+function calculatePerformanceScore(metrics) {
+    const weights = {
+        likes: 0.4,
+        replies: 0.3,
+        clickThrough: 0.2,
+        conversion: 0.1
+    };
+
+    return (
+        metrics.likes * weights.likes +
+        metrics.replies * weights.replies +
+        (metrics.engagement?.clickThroughRate || 0) * weights.clickThrough +
+        (metrics.engagement?.conversionRate || 0) * weights.conversion
+    );
+}
+
+/**
  * Generate insights based on performance metrics
  */
 function generateInsights(engagement) {
-    const latest = engagement.metricsHistory[engagement.metricsHistory.length - 1];
-    const trend = engagement.performance.trend;
+    const insights = [];
+    const current = engagement.metricsHistory[engagement.metricsHistory.length - 1];
+
+    // Response time insight
+    if (current.engagement?.responseTime < 60) {
+        insights.push({
+            type: 'engagement',
+            message: 'Quick response time indicates high relevance',
+            timestamp: new Date(),
+            metrics: current
+        });
+    }
 
     // Growth rate insights
-    if (trend.likesGrowthRate > 0.5) {
-        engagement.addInsight('growth', 'High engagement growth rate detected', {
-            growthRate: trend.likesGrowthRate
+    if (engagement.trends?.likesGrowthRate > 50) {
+        insights.push({
+            type: 'growth',
+            message: 'Significant increase in likes',
+            timestamp: new Date(),
+            metrics: current
         });
     }
 
-    // Performance insights
-    if (engagement.performance.trend.overallScore > 8) {
-        engagement.addInsight('performance', 'Comment is performing exceptionally well', {
-            score: engagement.performance.trend.overallScore
-        });
-    }
-
-    // Engagement pattern insights
-    if (latest.engagement.responseTime < 2) {
-        engagement.addInsight('engagement', 'Quick response time indicates high relevance', {
-            responseTime: latest.engagement.responseTime
-        });
-    }
+    return insights;
 }
 
 /**
@@ -135,54 +148,17 @@ function generateInsights(engagement) {
  */
 async function getTopComments(limit = 5) {
     try {
-        return await Engagement.find({ 'status.isActive': true })
-            .sort({ 'performance.trend.overallScore': -1 })
+        const engagements = await Engagement.find()
+            .sort({ 'trends.overallScore': -1 })
             .limit(limit);
+
+        return engagements.map(e => ({
+            text: e.activeComment.text,
+            metrics: e.activeComment.metrics,
+            score: e.trends?.overallScore || 0
+        }));
     } catch (error) {
         console.error('Error getting top comments:', error);
-        throw error;
-    }
-}
-
-/**
- * Check and update engagement for all active tracked comments
- */
-async function checkEngagement() {
-    try {
-        const activeEngagements = await Engagement.find({ 'status.isActive': true });
-        console.log(`Checking engagement for ${activeEngagements.length} comments`);
-
-        for (const engagement of activeEngagements) {
-            try {
-                // Here you would typically make a request to LinkedIn to get current metrics
-                // For now, we'll simulate this with random increases
-                const currentMetrics = engagement.activeComment.metrics;
-                const newMetrics = {
-                    likes: currentMetrics.likes + Math.floor(Math.random() * 5),
-                    replies: currentMetrics.replies + Math.floor(Math.random() * 2),
-                    clickThroughRate: Math.random() * 0.1,
-                    conversionRate: Math.random() * 0.05,
-                    responseTime: Math.random() * 5
-                };
-
-                await updateEngagementMetrics(engagement._id, newMetrics);
-                console.log(`Updated metrics for comment ${engagement._id}`);
-            } catch (error) {
-                console.error(`Error updating engagement for comment ${engagement._id}:`, error);
-                continue;
-            }
-        }
-
-        // Update rankings
-        const topComments = await getTopComments();
-        for (let i = 0; i < topComments.length; i++) {
-            topComments[i].status.rank = i + 1;
-            await topComments[i].save();
-        }
-
-        return topComments;
-    } catch (error) {
-        console.error('Error in engagement check:', error);
         throw error;
     }
 }
@@ -198,9 +174,9 @@ async function getEngagementHistory(engagementId) {
         }
 
         return {
-            history: engagement.metricsHistory,
-            trends: engagement.performance.trend,
-            insights: engagement.performance.insights
+            historyEntries: engagement.metricsHistory.length,
+            trends: engagement.trends,
+            insights: engagement.insights
         };
     } catch (error) {
         console.error('Error getting engagement history:', error);
@@ -218,37 +194,27 @@ async function getPerformanceComparison(engagementId) {
             throw new Error('Engagement record not found');
         }
 
-        // Get all scores
-        const allEngagements = await Engagement.find({}, 'performance.trend.overallScore');
-        const scores = allEngagements
-            .map(e => e.performance?.trend?.overallScore)
-            .filter(score => typeof score === 'number' && !isNaN(score));
+        // Get all engagements for comparison
+        const allEngagements = await Engagement.find();
         
-        if (scores.length === 0) {
-            engagement.performance.comparison = {
-                industryAverage: 0,
-                percentileRank: 100,
-                categoryRank: 1
-            };
-        } else {
-            const totalComments = scores.length;
-            const currentScore = engagement.performance.trend.overallScore || 0;
-            const industryAverage = scores.reduce((sum, score) => sum + score, 0) / totalComments;
-            
-            // Sort scores in ascending order
-            scores.sort((a, b) => a - b);
-            const rank = scores.findIndex(score => score >= currentScore);
-            const actualRank = rank === -1 ? totalComments : rank;
-            
-            engagement.performance.comparison = {
-                industryAverage: industryAverage,
-                percentileRank: ((totalComments - actualRank) / totalComments) * 100,
-                categoryRank: actualRank + 1
-            };
-        }
+        // Calculate industry average
+        const industryAverage = allEngagements.reduce((sum, e) => 
+            sum + (e.trends?.overallScore || 0), 0) / allEngagements.length;
 
-        await engagement.save();
-        return engagement.performance.comparison;
+        // Calculate percentile rank
+        const scores = allEngagements.map(e => e.trends?.overallScore || 0).sort((a, b) => a - b);
+        const currentScore = engagement.trends?.overallScore || 0;
+        const rank = scores.findIndex(score => score >= currentScore);
+        const percentileRank = (rank / scores.length) * 100;
+
+        // Calculate category rank
+        const categoryRank = scores.length - rank;
+
+        return {
+            industryAverage,
+            percentileRank,
+            categoryRank
+        };
     } catch (error) {
         console.error('Error getting performance comparison:', error);
         throw error;
@@ -259,7 +225,6 @@ module.exports = {
     startEngagementTracking,
     updateEngagementMetrics,
     getTopComments,
-    checkEngagement,
     getEngagementHistory,
     getPerformanceComparison
 };

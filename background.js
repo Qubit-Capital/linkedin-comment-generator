@@ -34,6 +34,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true; // Will respond asynchronously
     }
 
+    if (request.action === 'generateComment') {
+        const response = await fetch('https://api-bcbe5a.stack.tryrelevance.com/latest/studios/e24e0d8f-55bc-42b3-b4c0-ef86b7f9746c/trigger_limited', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                params: {
+                    linked_in_post: request.postText
+                },
+                project: "8cdcb88c-3a0b-44b1-915e-09454e18f5e5"
+            })
+        });
+
+        if (!response.ok) {
+            sendResponse({ success: false, error: `API request failed: ${response.statusText}` });
+            return true;
+        }
+
+        const text = await response.text();
+        sendResponse({ success: true, data: text });
+        return true;
+    }
+
     if (request.action === 'updateEngagement') {
         updateCommentEngagement(request.commentId, request.metrics)
             .then(result => sendResponse({ success: true, result }))
