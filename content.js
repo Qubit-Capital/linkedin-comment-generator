@@ -104,57 +104,16 @@ function displayCommentOptions(comments, modal, commentField) {
                 <span class="comment-tone ${toneClass}">${tone}</span>
             </div>
             <div class="comment-text">${comment.text || ''}</div>
-            <div class="comment-actions">
-                <button class="use-comment-button">Use This Comment</button>
-            </div>
         `;
         
-        option.querySelector('.use-comment-button').addEventListener('click', async () => {
-            try {
-                const postId = postContainer.getAttribute('data-urn') || 
-                              postContainer.getAttribute('data-id');
-                              
-                const postUrl = window.location.href;
-                
-                // Prepare data for logging
-                const commentData = {
-                    postId: postId,
-                    postUrl: postUrl,
-                    postContent: getPostText(postContainer),
-                    comment: {
-                        text: comment.text,
-                        tone: tone,
-                        timestamp: new Date(),
-                        isSelected: true
-                    },
-                    metrics: {
-                        likes: 0,
-                        replies: 0,
-                        lastChecked: new Date()
-                    }
-                };
-                
-                // Send data to background script for storage
-                const response = await chrome.runtime.sendMessage({
-                    action: 'saveComment',
-                    data: commentData
-                });
-                
-                if (!response.success) {
-                    throw new Error(response.error || 'Failed to save comment data');
-                }
-                
-                // Update UI
-                commentField.focus();
-                commentField.textContent = comment.text;
-                commentField.dispatchEvent(new Event('input', { bubbles: true }));
-                modal.classList.add('hidden');
-                showNotification('Comment added successfully!', 'success');
-                
-            } catch (error) {
-                console.error('Error saving comment:', error);
-                showNotification('Error saving comment data', 'error');
-            }
+        // Add click event to the entire comment option
+        option.addEventListener('click', () => {
+            commentField.textContent = comment.text;
+            commentField.dispatchEvent(new Event('input', { bubbles: true }));
+            commentField.dispatchEvent(new Event('change', { bubbles: true }));
+            commentField.focus();
+            modal.classList.add('hidden');
+            showNotification('Comment added successfully!', 'success');
         });
         
         cardsContainer.appendChild(option);

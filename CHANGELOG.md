@@ -42,6 +42,14 @@ All notable changes to this project will be documented in this file.
   - Implement report delivery system
   - Create customizable report formats
 
+## [v1.1] - 2024-12-18
+
+### Changed
+- Removed "Use This Comment" button functionality.
+- Implemented click-to-paste functionality for comment boxes.
+- Clicking on a comment box now directly pastes the comment into the LinkedIn comment field.
+- Improved user interaction by simplifying the comment selection process.
+
 ## [1.2.1] - 2024-12-17
 
 ### Fixed
