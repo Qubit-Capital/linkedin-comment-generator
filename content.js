@@ -145,6 +145,7 @@ function displayCommentOptions(comments, modal, commentField) {
                 }
                 
                 // Update UI
+                commentField.focus();
                 commentField.textContent = comment.text;
                 commentField.dispatchEvent(new Event('input', { bubbles: true }));
                 modal.classList.add('hidden');
