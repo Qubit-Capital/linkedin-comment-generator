@@ -17,12 +17,16 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.js"]
+    "testMatch": [
+      "**/tests/**/*.js"
+    ]
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "mongodb": "^6.11.0",
-    "mongoose": "^8.9.0"
+    "mongoose": "^8.9.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",

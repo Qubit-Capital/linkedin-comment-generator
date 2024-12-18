@@ -96,6 +96,30 @@ All notable changes to this project will be documented in this file.
   - `test-operations.js`: General operations testing
   - `test-schema.js`: Schema validation testing
 
+## [1.1.0] - 2024-12-18
+
+### Added
+- Modern UI design with improved modal interface
+- Vertical loading animation with progress indicator
+- Grid layout for displaying generated comments
+- Tone-based color coding for comments
+- MongoDB integration for comment tracking and analytics
+- Database logging for user interactions and comment performance
+
+### Changed
+- Enhanced modal structure to remove duplicate elements
+- Improved button styling and interactions
+- Updated close button with 'X' icon
+- Refined error handling and user feedback
+- Fixed MongoDB connection and collection structure
+- Corrected database schema and model configurations
+
+### Fixed
+- Duplicate headings and close buttons in modal
+- MongoDB connection string format
+- Collection naming consistency in database
+- Database connection error handling
+
 ## [1.1.0] - 2024-12-17
 
 ### Added

@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://malaygupta:3VXz24KhjZJEbX55@linkedin-comment-genera.oq68x.mongodb.net/?retryWrites=true&w=majority&appName=linkedin-comment-generator";
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable inside .env');
+}
 
 let connection = null;
 
@@ -19,12 +22,7 @@ async function connectDB() {
                 version: '1',
                 strict: true,
                 deprecationErrors: true,
-            },
-            maxPoolSize: 10,
-            tls: true,
-            tlsAllowInvalidCertificates: true, // Only for development
-            retryWrites: true,
-            w: 'majority'
+            }
         });
         
         console.log('Connected to MongoDB successfully');
